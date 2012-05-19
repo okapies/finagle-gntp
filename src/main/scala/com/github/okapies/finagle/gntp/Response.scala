@@ -38,14 +38,6 @@ case class SubscribeOkResponse(
   headers: Map[String, String]) extends OkResponse
 
 /**
- * ERROR response
- */
-case class ErrorResponse(
-  code: ErrorCode,
-  description: String,
-  headers: Map[String, String]) extends Response
-
-/**
  * CALLBACK response
  */
 case class CallbackResponse(
@@ -56,3 +48,11 @@ case class CallbackResponse(
   context: String,
   contextType: String,
   headers: Map[String, String]) extends Response
+
+/**
+ * ERROR response
+ */
+case class ErrorResponse(
+  code: ErrorCode,
+  description: String,
+  headers: Map[String, String])

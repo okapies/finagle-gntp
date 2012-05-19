@@ -15,14 +15,17 @@ class GntpFrameDecoder extends DelimiterBasedFrameDecoder(
       channel: Channel,
       buffer: ChannelBuffer): AnyRef =
     ctx.getAttachment match {
-      case null => super.decode(ctx, channel, buffer)
+      case null => {
+        // delegate to delimiter based decoder.
+        super.decode(ctx, channel, buffer)
+      }
       case (_, frameLength: AnyRef) => Int.unbox(frameLength) match {
         case len: Int if buffer.readableBytes < (len + MessageFormat.TERMINATOR.length) => {
-          // there's not enough data
+          // there's not enough data.
           null
         }
         case len: Int => {
-          // read data and the message terminator
+          // read data and the message terminator.
           buffer.readBytes(len + MessageFormat.TERMINATOR.length).slice(0, len)
         }
       }

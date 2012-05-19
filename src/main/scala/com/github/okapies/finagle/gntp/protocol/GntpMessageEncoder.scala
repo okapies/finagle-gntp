@@ -1,6 +1,8 @@
 package com.github.okapies.finagle.gntp.protocol
 
 import java.io.{OutputStreamWriter, Writer}
+import java.net.URI
+import java.util.Date
 
 import org.jboss.netty.buffer.{ChannelBufferOutputStream, ChannelBuffers}
 import org.jboss.netty.channel.{Channel, ChannelHandlerContext}
@@ -11,7 +13,8 @@ import com.github.okapies.finagle.gntp.protocol.GntpConstants._
 
 abstract class GntpMessageEncoder extends OneToOneEncoder {
 
-  import com.github.okapies.finagle.gntp.protocol.GntpConstants.MessageFormat._
+  import GntpConstants.MessageFormat._
+  import util.GntpDateFormat
 
   protected var writer: Writer = null
 
@@ -64,6 +67,18 @@ abstract class GntpMessageEncoder extends OneToOneEncoder {
 
   protected def header(name: String, value: Boolean) {
     writer.write(name + ": " + value + LINE_SEPARATOR)
+  }
+
+  protected def header(name: String, value: Date) {
+    if (value != null) {
+      writer.write(name + ": " + GntpDateFormat.toString(value) + LINE_SEPARATOR)
+    }
+  }
+
+  protected def header(name: String, value: URI) {
+    if (value != null) {
+      writer.write(name + ": " + value.toString + LINE_SEPARATOR)
+    }
   }
 
   protected def iconHeader(name: String, icon: Icon) {

@@ -17,9 +17,9 @@ class Gntp extends CodecFactory[Request, Response] {
         def getPipeline = {
           val pipeline = Channels.pipeline()
           pipeline.addLast("logging-handler", Gntp.loggingHandler)
+          pipeline.addLast("request-encoder", new GntpRequestEncoder)
           pipeline.addLast("frame-decoder", new GntpFrameDecoder)
-          pipeline.addLast("message-decoder", new GntpResponseDecoder)
-          pipeline.addLast("message-encoder", new GntpRequestEncoder)
+          pipeline.addLast("response-decoder", new GntpResponseDecoder)
 
           pipeline
         }
@@ -34,8 +34,8 @@ class Gntp extends CodecFactory[Request, Response] {
           val pipeline = Channels.pipeline()
           pipeline.addLast("logging-handler", Gntp.loggingHandler)
           pipeline.addLast("frame-decoder", new GntpFrameDecoder)
-          pipeline.addLast("message-decoder", new GntpRequestDecoder)
-          pipeline.addLast("message-encoder", new GntpResponseEncoder)
+          pipeline.addLast("request-decoder", new GntpRequestDecoder)
+          pipeline.addLast("response-encoder", new GntpResponseEncoder)
 
           pipeline
         }
@@ -60,9 +60,8 @@ object Gntp {
           case _ => None
         }
         buf match {
-          case Some(b) => getLogger.log(
-            getLevel,
-            e.toString + " - (STRING:>>>\n" + b.toString(ENCODING) + "<<<")
+          case Some(b) =>
+            getLogger.log(getLevel, e.toString + " - (STRING:>>>\n" + b.toString(ENCODING) + "<<<")
           case None => super.log(e)
         }
       }

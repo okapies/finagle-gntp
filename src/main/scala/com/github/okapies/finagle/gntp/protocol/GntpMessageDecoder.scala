@@ -1,6 +1,7 @@
 package com.github.okapies.finagle.gntp.protocol
 
-import java.io.InputStreamReader
+
+import java.io.{InputStreamReader, IOException}
 
 import scala.collection._
 
@@ -44,27 +45,51 @@ abstract class GntpMessageDecoder
       ctx: ChannelHandlerContext,
       channel: Channel,
       buffer: ChannelBuffer,
-      state: GntpMessageDecoderState): AnyRef = state match {
-    case READ_INFO_AND_HEADER => {
-      val reader = newMessageReader(buffer)
-      parseInformationLine(reader) match {
-        case Some((msgType, enc, auth)) => {
-          this.messageType = msgType
-          this.encryption = enc
-          this.authorization = auth
+      state: GntpMessageDecoderState): AnyRef =
+    try {
+      state match {
+        case READ_INFO_AND_HEADER => {
+          val reader = newMessageReader(buffer)
+          val info = parseInformationLine(reader)
+          info match {
+            case Some((msgType, enc, auth)) => {
+              this.messageType = msgType
+              this.encryption = enc
+              this.authorization = auth
 
-          this.headers = parseHeader(reader)
-          this.notificationTypeCount =
-            (messageType, headers.get(NOTIFICATIONS_COUNT)) match {
-              case (REGISTER, Some(count)) => count.toInt
-              case _ => 0
+              this.headers = parseHeader(reader)
+              this.notificationTypeCount =
+                (messageType, headers.get(NOTIFICATIONS_COUNT)) match {
+                  case (REGISTER, Some(count)) => count.toInt
+                  case _ => 0
+                }
+              this.resourceIds = headers.values.collect {
+                case value if value.startsWith(GROWL_RESOURCE_PREFIX) =>
+                  value.substring(GROWL_RESOURCE_PREFIX.length).trim
+              }.toSet
+
+              if (notificationTypeCount > 0) {
+                checkpoint(READ_NOTIFICATION_TYPE)
+                null
+              } else if (resourceIds.size > 0) {
+                checkpoint(READ_RESOURCE_HEADER)
+                null
+              } else {
+                reset()
+              }
             }
-          this.resourceIds = headers.values.collect {
-            case value if value.startsWith(GROWL_RESOURCE_PREFIX) =>
-              value.substring(GROWL_RESOURCE_PREFIX.length).trim
-          }.toSet
+            case None => { // no message
+              checkpoint()
+              null
+            }
+          }
+        }
+        case READ_NOTIFICATION_TYPE => {
+          val reader = newMessageReader(buffer)
+          val notificationType = parseNotificationType(reader)
+          notificationTypes = notificationType :: notificationTypes
 
-          if (notificationTypeCount > 0) {
+          if (notificationTypes.size < notificationTypeCount) {
             checkpoint(READ_NOTIFICATION_TYPE)
             null
           } else if (resourceIds.size > 0) {
@@ -74,85 +99,82 @@ abstract class GntpMessageDecoder
             reset()
           }
         }
-        case None => null // no message
-      }
-    }
-    case READ_NOTIFICATION_TYPE => {
-      val reader = newMessageReader(buffer)
-      val notificationType = parseNotificationType(reader)
-      notificationTypes = notificationType :: notificationTypes
+        case READ_RESOURCE_HEADER => {
+          val reader = newMessageReader(buffer)
+          val (id, length) = parseResourceHeader(reader)
+          if (resourceIds.contains(id)) {
+            ctx.setAttachment((id, length)) // set frame length.
 
-      if (notificationTypes.size < notificationTypeCount) {
-        checkpoint(READ_NOTIFICATION_TYPE)
-        null
-      } else if (resourceIds.size > 0) {
-        checkpoint(READ_RESOURCE_HEADER)
-        null
-      } else {
-        reset()
-      }
-    }
-    case READ_RESOURCE_HEADER => {
-      val reader = newMessageReader(buffer)
-      val (id, length) = parseResourceHeader(reader)
-      if (resourceIds.contains(id)) {
-        ctx.setAttachment((id, length)) // set frame length.
+            checkpoint(READ_RESOURCE_DATA)
+            null
+          } else {
+            throw new GntpProtocolException(
+              INVALID_REQUEST,
+              "Received a resource with invalid id: " + id)
+          }
+        }
+        case READ_RESOURCE_DATA => {
+          val (id: String, length: Int) = ctx.getAttachment
+          val data: ChannelBuffer = buffer.readBytes(length)
+          resources = resources + ((id, Resource(id, length, data)))
 
-        checkpoint(READ_RESOURCE_DATA)
-        null
-      } else {
-        throw new GntpProtocolException(
-          INVALID_REQUEST,
-          "Received a resource with invalid id: " + id)
-      }
-    }
-    case READ_RESOURCE_DATA => {
-      val (id: String, length: Int) = ctx.getAttachment
-      val data: ChannelBuffer = buffer.readBytes(length)
-      resources = resources + ((id, Resource(id, length, data)))
+          ctx.setAttachment(null) // reset frame length
 
-      ctx.setAttachment(null) // reset frame length
-
-      if (resources.size < resourceIds.size) {
-        checkpoint(READ_RESOURCE_HEADER)
-        null
-      } else {
-        reset()
+          if (resources.size < resourceIds.size) {
+            checkpoint(READ_RESOURCE_HEADER)
+            null
+          } else {
+            reset()
+          }
+        }
+        case _ =>
+          throw new Error("Shouldn't reach heer.")
       }
+    } catch {
+      case e: IOException =>
+        throw new GntpProtocolException(NETWORK_FAILURE, e)
     }
-    case _ =>
-      throw new Error("Shouldn't reach heer.")
-  }
 
   override def checkpoint(state: GntpMessageDecoderState) {
     super.checkpoint(state)
     log.debug("State updated: " + state)
   }
 
-  private def reset(): AnyRef = {
-    // decode message
-    val message = messageType match {
-      case null => null
-      case _ => decodeMessage()
+  private def reset(): AnyRef =
+    try {
+      // decode message
+      val message = messageType match {
+        case null => null
+        case _ => decodeMessage()
+      }
+      log.debug("Received a message: " + message)
+
+      message
+    } catch {
+      case e: GntpServiceException => {
+        log.debug("Received an error: ", e)
+        throw e
+      }
+      case e: GntpException => {
+        log.debug("Received an invalid response: ", e)
+        throw e
+      }
+    } finally {
+      // clear fields
+      this.messageType = null
+      this.encryption = None
+      this.authorization = None
+      this.headers = immutable.Map.empty
+      this.notificationTypeCount = 0
+      this.notificationTypes = Nil
+      this.resourceIds = immutable.Set.empty
+      this.resources = immutable.Map.empty
+
+      // reset checkpoint
+      checkpoint(READ_INFO_AND_HEADER)
     }
-    log.debug("Received a message: " + message)
 
-    // clear fields
-    this.messageType = null
-    this.encryption = None
-    this.authorization = None
-    this.headers = immutable.Map.empty
-    this.notificationTypeCount = 0
-    this.notificationTypes = Nil
-    this.resourceIds = immutable.Set.empty
-    this.resources = immutable.Map.empty
-
-    // reset checkpoint
-    checkpoint(READ_INFO_AND_HEADER)
-
-    message
-  }
-
+  @throws(classOf[GntpException])
   protected def decodeMessage(): AnyRef
 
   @throws(classOf[GntpProtocolException])
@@ -160,7 +182,7 @@ abstract class GntpMessageDecoder
       reader: MessageReader): Option[(String, Option[Encryption], Option[Authorization])] = {
     val firstLine = reader.readLine()
     firstLine match {
-      case null => None
+      case null | "" => None
       case informationLineMatcher(
           version,
           messageType,
@@ -253,14 +275,6 @@ object GntpMessageDecoder {
    * `"GNTP/&lt;version&gt; &lt;messagetype&gt; &lt;encryptionAlgorithmID&gt;[:&lt;ivValue&gt;][ &lt;keyHashAlgorithmID&gt;:&lt;keyHash&gt;.&lt;salt&gt;]"`
    */
   private val informationLineMatcher =
-    """(?:GNTP/)(.\..)\s+(\S+)\s+([^\s:]+)(?::(\S+))?(?:\s+([^\s:]+):([^\s.]+)\.(\S+))?""".r
-
-  private[protocol] def hasRequiredHeader(
-      headers: Map[String, String], required: Set[String]): Option[Set[String]] = {
-    required.filter(name => !headers.contains(name)) match {
-      case missings if missings.size > 0 => Some(missings)
-      case _ => None
-    }
-  }
+    """(?:GNTP/)(.\..)\s+(\S+)\s+([^\s:]+)(?::(\S+))?(?:\s+([^\s:]+):([^\s.]+)\.(\S+))?\s*""".r
 
 }

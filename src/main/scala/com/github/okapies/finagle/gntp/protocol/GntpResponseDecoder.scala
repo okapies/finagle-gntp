@@ -7,48 +7,20 @@ import com.github.okapies.finagle.gntp.ErrorCode._
 
 class GntpResponseDecoder extends GntpMessageDecoder {
 
+  import GntpResponseDecoder._
+
   import GntpConstants.RequestMessageType._
   import GntpConstants.ResponseMessageType._
   import GntpHeader._
 
-  protected def requiredHeaders: Set[String] =
-    messageType match {
-      case OK => null
-      case CALLBACK => {
-        val context = headers.get(NOTIFICATION_CALLBACK_CONTEXT)
-        val contextType = headers.get(NOTIFICATION_CALLBACK_CONTEXT_TYPE)
-        val target = headers.get(NOTIFICATION_CALLBACK_TARGET)
-        if (target.isDefined) {
-          // URL Callbacks
-          immutable.Set(NOTIFICATION_CALLBACK_TARGET)
-        } else if (context.isDefined && contextType.isDefined) {
-          // Socket Callbacks
-          immutable.Set(
-            NOTIFICATION_CALLBACK_CONTEXT,
-            NOTIFICATION_CALLBACK_CONTEXT_TYPE,
-            APPLICATION_NAME,
-            NOTIFICATION_ID,
-            NOTIFICATION_CALLBACK_RESULT,
-            NOTIFICATION_CALLBACK_TIMESTAMP
-          )
-        } else {
-          // It should fail because the message has no required headers.
-          immutable.Set(
-            NOTIFICATION_CALLBACK_CONTEXT,
-            NOTIFICATION_CALLBACK_CONTEXT_TYPE,
-            NOTIFICATION_CALLBACK_TARGET
-          )
-        }
-      }
-      case ERROR => immutable.Set.empty
-      case _ => immutable.Set.empty
-    }
+  import util.GntpDateFormat._
 
+  @throws(classOf[GntpException])
   protected def decodeMessage(): AnyRef = {
     messageType match {
       case OK => createOk()
       case CALLBACK => createCallback()
-      case ERROR => createError()
+      case ERROR => createError() // throws GntpServiceException
       case _ => // invalid message type
         throw new GntpProtocolException(
           UNKNOWN_PROTOCOL,
@@ -83,11 +55,29 @@ class GntpResponseDecoder extends GntpMessageDecoder {
     }
   }
 
-  private def createCallback(): CallbackResponse = {
-    CallbackResponse(null, null, null, null, null, null, headers) // TODO:
-  }
+  @throws(classOf[GntpProtocolException])
+  private def createCallback(): CallbackResponse =
+    requiredCallbackHeaders.filter(h => !headers.contains(h)) match {
+      case missings if missings.size > 0 =>
+        throw new GntpProtocolException(
+          REQUIRED_HEADER_MISSING,
+          "Required headers are missing: " + missings.mkString(", "))
+      case _ => {
+        val context = headers(NOTIFICATION_CALLBACK_CONTEXT)
+        val contextType = headers(NOTIFICATION_CALLBACK_CONTEXT_TYPE)
 
-  private def createError(): ErrorResponse = {
+        val applicationName = headers(APPLICATION_NAME)
+        val notificationId = headers(NOTIFICATION_ID)
+        val result = CallbackResult.withName(headers(NOTIFICATION_CALLBACK_RESULT))
+        val timestamp = toDate(headers(NOTIFICATION_CALLBACK_TIMESTAMP))
+
+        CallbackResponse(
+          applicationName, notificationId, result, timestamp, context, contextType, headers)
+      }
+    }
+
+  @throws(classOf[GntpServiceException])
+  private def createError(): AnyRef = {
     val code = headers.get(ERROR_CODE) match {
       case Some(code) => ErrorCode(code.toInt)
       case None => throw new GntpProtocolException(
@@ -96,7 +86,22 @@ class GntpResponseDecoder extends GntpMessageDecoder {
     }
     val desc = headers.get(ERROR_DESCRIPTION).getOrElse(null)
 
-    ErrorResponse(code, desc, headers)
+    throw new GntpServiceException(code, desc, headers)
   }
+
+}
+
+object GntpResponseDecoder {
+
+  import GntpHeader._
+
+  private val requiredCallbackHeaders = immutable.Set(
+    NOTIFICATION_CALLBACK_CONTEXT,
+    NOTIFICATION_CALLBACK_CONTEXT_TYPE,
+    APPLICATION_NAME,
+    NOTIFICATION_ID,
+    NOTIFICATION_CALLBACK_RESULT,
+    NOTIFICATION_CALLBACK_TIMESTAMP
+  )
 
 }

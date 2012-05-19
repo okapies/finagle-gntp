@@ -9,7 +9,7 @@ import scala.collection._
 /**
  * Request
  */
-sealed trait Request
+sealed trait Request { def customHeaders: Map[String, Any] }
 
 /**
  * REGISTER request
@@ -18,7 +18,9 @@ case class Register(
 
   application: Application,
 
-  notificationTypes: List[NotificationType]
+  notificationTypes: List[NotificationType],
+
+  customHeaders: Map[String, Any] = immutable.Map.empty
 
 ) extends Request
 
@@ -73,7 +75,7 @@ case class Notify(
 
   callback: Callback = NoCallback,
 
-  customHeaders: Map[String, AnyRef] = immutable.Map.empty
+  customHeaders: Map[String, Any] = immutable.Map.empty
 
 ) extends Request
 
@@ -120,7 +122,9 @@ case class Subscribe(
 
   name: String,
 
-  port: Int = -1
+  port: Int = -1,
+
+  customHeaders: Map[String, Any] = immutable.Map.empty
 
 ) extends Request
 
@@ -149,10 +153,6 @@ sealed trait Callback
 case object NoCallback extends Callback
 
 case class SocketCallback(
-  applicationName: String,
-  notificationId: String,
-  result: String,
-  timestamp: Date,
   context: String,
   contextType: String
 ) extends Callback
