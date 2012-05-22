@@ -1,6 +1,6 @@
 package com.github.okapies.finagle.gntp
 
-object GntpHeader {
+object Header {
 
   // Response-* header
 

@@ -2,12 +2,12 @@ package com.github.okapies.finagle.gntp.protocol
 
 import scala.collection.immutable
 
-import com.github.okapies.finagle.gntp.{ErrorCode, GntpHeader, Request}
+import com.github.okapies.finagle.gntp.{ErrorCode, Header, Request}
 
 class GntpRequestDecoder extends GntpMessageDecoder {
 
   import GntpConstants.RequestMessageType._
-  import GntpHeader._
+  import Header._
 
   protected def requiredHeaders: Set[String] =
     messageType match {

@@ -25,8 +25,11 @@ class GntpFrameDecoder extends DelimiterBasedFrameDecoder(
           null
         }
         case len: Int => {
-          // read data and the message terminator.
-          buffer.readBytes(len + MessageFormat.TERMINATOR.length).slice(0, len)
+          // read data and skip the message terminator.
+          val frame = buffer.readBytes(len)
+          buffer.skipBytes(MessageFormat.TERMINATOR.length)
+
+          frame
         }
       }
     }
@@ -34,15 +37,6 @@ class GntpFrameDecoder extends DelimiterBasedFrameDecoder(
   override def newCumulationBuffer(
       ctx: ChannelHandlerContext,
       minimumCapacity: Int): ChannelBuffer =
-    ctx.getAttachment match {
-      case null =>
-        super.newCumulationBuffer(ctx, minimumCapacity)
-      case (_, frameLength: AnyRef) => Int.unbox(frameLength) match {
-        case len: Int => {
-          val factory = ctx.getChannel.getConfig.getBufferFactory
-          ChannelBuffers.dynamicBuffer(factory.getDefaultOrder, len, factory)
-        }
-      }
-    }
+    super.newCumulationBuffer(ctx, minimumCapacity)
 
 }

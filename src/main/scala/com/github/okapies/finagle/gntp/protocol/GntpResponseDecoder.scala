@@ -11,7 +11,7 @@ class GntpResponseDecoder extends GntpMessageDecoder {
 
   import GntpConstants.RequestMessageType._
   import GntpConstants.ResponseMessageType._
-  import GntpHeader._
+  import Header._
 
   import util.GntpDateFormat._
 
@@ -93,7 +93,7 @@ class GntpResponseDecoder extends GntpMessageDecoder {
 
 object GntpResponseDecoder {
 
-  import GntpHeader._
+  import Header._
 
   private val requiredCallbackHeaders = immutable.Set(
     NOTIFICATION_CALLBACK_CONTEXT,

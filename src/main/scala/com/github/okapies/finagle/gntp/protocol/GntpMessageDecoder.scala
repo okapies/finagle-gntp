@@ -1,6 +1,5 @@
 package com.github.okapies.finagle.gntp.protocol
 
-
 import java.io.{InputStreamReader, IOException}
 
 import scala.collection._
@@ -8,6 +7,7 @@ import scala.collection._
 import org.jboss.netty.buffer.{ChannelBufferInputStream, ChannelBuffer}
 import org.jboss.netty.channel.{Channel, ChannelHandlerContext}
 import org.jboss.netty.handler.codec.replay.ReplayingDecoder
+
 import org.slf4j.LoggerFactory
 
 import com.github.okapies.finagle.gntp.protocol.GntpMessageDecoderState._
@@ -19,7 +19,7 @@ abstract class GntpMessageDecoder
   import GntpMessageDecoder._
 
   import com.github.okapies.finagle.gntp.ErrorCode._
-  import com.github.okapies.finagle.gntp.GntpHeader._
+  import com.github.okapies.finagle.gntp.Header._
   import com.github.okapies.finagle.gntp.protocol.GntpConstants._
   import com.github.okapies.finagle.gntp.protocol.GntpConstants.MessageFormat._
   import com.github.okapies.finagle.gntp.protocol.GntpConstants.RequestMessageType._
@@ -238,7 +238,7 @@ abstract class GntpMessageDecoder
   @throws(classOf[GntpProtocolException])
   private def parseHeader(reader: MessageReader): Map[String, String] =
     Stream.continually(reader.readLine()).takeWhile(_ != null).map {
-      case line => GntpHeader.parse(line) match {
+      case line => Header.parse(line) match {
         case Some(pair) => pair
         case None => throw new GntpProtocolException(
           UNKNOWN_PROTOCOL,

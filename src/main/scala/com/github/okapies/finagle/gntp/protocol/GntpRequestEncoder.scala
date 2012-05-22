@@ -11,7 +11,7 @@ class GntpRequestEncoder extends GntpMessageEncoder {
 
   import ErrorCode._
   import GntpConstants.RequestMessageType._
-  import GntpHeader._
+  import Header._
 
   def encodeMessage(
       request: Request, encryption: Encryption, authorization: Option[Authorization]) {
