@@ -8,9 +8,11 @@ import protocol.Gntp
 
 object GntpClient {
 
-  def apply(hostName: String): Service[Request, Response] = ClientBuilder().
+  import protocol.GntpConstants._
+
+  def apply(hostName: String, port: Int = DEFAULT_GNTP_PORT): Service[Request, Response] = ClientBuilder().
     codec(Gntp()).
-    hosts(hostName + ":23053").
+    hosts(hostName + ":" + port).
     hostConnectionLimit(1).
     tcpConnectTimeout(1.second).
     retries(2).

@@ -1,103 +1,92 @@
 package com.github.okapies.finagle.gntp.protocol
 
-import java.net.URI
-import java.util.Date
+import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 
-import scala.collection._
+import com.twitter.naggati.Encoder
 
 import com.github.okapies.finagle.gntp._
 
-class GntpRequestEncoder extends GntpMessageEncoder {
+class GntpRequestEncoder extends Encoder[Request] {
 
-  import ErrorCode._
   import GntpConstants.RequestMessageType._
   import Header._
 
-  def encodeMessage(
-      request: Request, encryption: Encryption, authorization: Option[Authorization]) {
+  def encode(request: Request): Option[ChannelBuffer] = {
+    val w = new GntpMessageWriter(ChannelBuffers.dynamicBuffer)
     try {
       request match {
-        case register: Register => {
-          informationLine(REGISTER, encryption, authorization)
-          encodeRegister(register)
-        }
-        case notify: Notify => {
-          informationLine(NOTIFY, encryption, authorization)
-          encodeNotify(notify)
-        }
-        case subscribe: Subscribe => {
-          informationLine(SUBSCRIBE, encryption, authorization)
-          encodeSubscribe(subscribe)
-        }
+        case register: Register => encodeRegister(w, register)
+        case notify: Notify => encodeNotify(w, notify)
+        case subscribe: Subscribe => encodeSubscribe(w, subscribe)
       }
 
-      // custom headers
-      request.customHeaders foreach {
-        case (name, value) if name.startsWith("X-") => {
-          value match {
-            case str: String => header(name, str)
-            case i: java.lang.Integer => header(name, i)
-            case b: java.lang.Boolean => header(name, b)
-            case date: Date => header(name, date)
-            case uri: URI => header(name, uri)
-            case _ => throw new IllegalArgumentException(
-              "The value is unsupported type: %s".format(name))
-          }
-        }
-        case _ => throw new GntpProtocolException(
-          INVALID_REQUEST, "Custom headers must start with 'X-'.")
-      }
-    } finally {
+      // other headers (generic, custom and data)
+      w.headers(request.headers)
+
+      // TODO: binary sections
+
       // terminator
-      emptyLine()
+      w.emptyLine()
+    } finally {
+      w.close()
+    }
+
+    Some(w.toChannelBuffer)
+  }
+
+  private def encodeRegister(w: GntpMessageWriter, register: Register) {
+    w.informationLine(REGISTER, register.encryption, register.authorization)
+
+    val app = register.application
+    w.header(APPLICATION_NAME, app.name) // required
+    w.iconHeader(APPLICATION_ICON, app.icon)
+
+    val types = app.notificationTypes
+    w.header(NOTIFICATIONS_COUNT, types.size) // required
+    types.foreach { case (name, t) =>
+      w.emptyLine()
+      w.header(NOTIFICATION_NAME, name) // required
+      w.header(NOTIFICATION_DISPLAY_NAME, t.displayName)
+      w.header(NOTIFICATION_ENABLED, t.enabled)
+      w.iconHeader(NOTIFICATION_ICON, t.icon)
     }
   }
 
-  private def encodeRegister(register: Register) {
-    header(APPLICATION_NAME, register.application.name) // required
-    iconHeader(APPLICATION_ICON, register.application.icon)
+  private def encodeNotify(w: GntpMessageWriter, notify: Notify) {
+    w.informationLine(NOTIFY, notify.encryption, notify.authorization)
 
-    header(NOTIFICATIONS_COUNT, register.notificationTypes.size) // required
-    register.notificationTypes.foreach { t =>
-      emptyLine()
-      header(NOTIFICATION_NAME, t.name) // required
-      header(NOTIFICATION_DISPLAY_NAME, t.displayName)
-      header(NOTIFICATION_ENABLED, t.enabled)
-      iconHeader(NOTIFICATION_ICON, t.icon)
-    }
-  }
+    w.header(APPLICATION_NAME, notify.applicationName) // required
+    w.header(NOTIFICATION_NAME, notify.name) // required
+    w.header(NOTIFICATION_ID, notify.id)
+    w.header(NOTIFICATION_TITLE, notify.title) // required
+    w.header(NOTIFICATION_TEXT, notify.text)
 
-  private def encodeNotify(notify: Notify) {
-    header(APPLICATION_NAME, notify.applicationName) // required
-    header(NOTIFICATION_NAME, notify.name) // required
-    header(NOTIFICATION_ID, notify.id)
-    header(NOTIFICATION_TITLE, notify.title) // required
-    header(NOTIFICATION_TEXT, notify.text)
-
-    header(NOTIFICATION_STICKY, notify.sticky)
-    header(NOTIFICATION_PRIORITY, notify.priority.id)
-    iconHeader(NOTIFICATION_ICON, notify.icon)
-    header(NOTIFICATION_COALESCING_ID, notify.coalescingId)
+    w.header(NOTIFICATION_STICKY, notify.sticky)
+    w.header(NOTIFICATION_PRIORITY, notify.priority.id)
+    w.iconHeader(NOTIFICATION_ICON, notify.icon)
+    w.header(NOTIFICATION_COALESCING_ID, notify.coalescingId)
 
     notify.callback match {
-      case SocketCallback(context, contextType) => {
-        header(NOTIFICATION_CALLBACK_CONTEXT, context)
-        header(NOTIFICATION_CALLBACK_CONTEXT_TYPE, contextType)
+      case Some(SocketCallback(context, contextType)) => {
+        w.header(NOTIFICATION_CALLBACK_CONTEXT, context)
+        w.header(NOTIFICATION_CALLBACK_CONTEXT_TYPE, contextType)
       }
-      case UrlCallback(target) => {
-        header(NOTIFICATION_CALLBACK_TARGET, target)
+      case Some(UrlCallback(target)) => {
+        w.header(NOTIFICATION_CALLBACK_TARGET, target)
       }
-      case _ =>
+      case None =>
     }
   }
 
-  private def encodeSubscribe(subscribe: Subscribe) {
-    header(SUBSCRIBER_ID, subscribe.id) // required
-    header(SUBSCRIBER_NAME, subscribe.name) // required
+  private def encodeSubscribe(w: GntpMessageWriter, subscribe: Subscribe) {
+    w.informationLine(SUBSCRIBE, subscribe.encryption, subscribe.authorization)
+
+    w.header(SUBSCRIBER_ID, subscribe.id) // required
+    w.header(SUBSCRIBER_NAME, subscribe.name) // required
 
     subscribe.port match {
       case port if port >= 0 =>
-        header(SUBSCRIBER_PORT, subscribe.port)
+        w.header(SUBSCRIBER_PORT, subscribe.port)
       case _ =>
     }
   }

@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "com.twitter" % "finagle-core_2.9.1" % "4.0.2",
   "com.twitter" % "finagle-http_2.9.1" % "4.0.2",
   "com.twitter" % "finagle-stream_2.9.1" % "4.0.2",
-  "com.twitter" % "naggati_2.9.1" % "3.0.0",
+  "com.twitter" % "naggati_2.9.2" % "4.0.0",
   "org.slf4j" % "slf4j-api" % "1.6.4",
   "org.slf4j" % "slf4j-log4j12" % "1.6.4"
 )

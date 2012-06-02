@@ -3,9 +3,13 @@ package com.github.okapies.finagle.gntp
 import scala.collection._
 
 case class Authorization(
+
   algorithm: AuthorizationAlgorithm,
+
   keyHash: String,
+
   salt: String
+
 )
 
 trait AuthorizationAlgorithm { def name: String }

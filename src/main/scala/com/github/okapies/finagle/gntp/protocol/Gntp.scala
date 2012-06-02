@@ -6,6 +6,7 @@ import org.jboss.netty.handler.logging.LoggingHandler
 import org.jboss.netty.logging.InternalLogLevel
 
 import com.twitter.finagle.{Codec, CodecFactory}
+import com.twitter.naggati.{Codec => NaggatiCodec}
 
 import com.github.okapies.finagle.gntp.{Request, Response}
 
@@ -17,9 +18,8 @@ class Gntp extends CodecFactory[Request, Response] {
         def getPipeline = {
           val pipeline = Channels.pipeline()
           pipeline.addLast("logging-handler", Gntp.loggingHandler)
-          pipeline.addLast("request-encoder", new GntpRequestEncoder)
-          pipeline.addLast("frame-decoder", new GntpFrameDecoder)
-          pipeline.addLast("response-decoder", new GntpResponseDecoder)
+          pipeline.addLast("client-codec",
+            new NaggatiCodec(GntpResponseCodec.decode, GntpRequestCodec.encode))
 
           pipeline
         }
@@ -33,9 +33,8 @@ class Gntp extends CodecFactory[Request, Response] {
         def getPipeline = {
           val pipeline = Channels.pipeline()
           pipeline.addLast("logging-handler", Gntp.loggingHandler)
-          pipeline.addLast("frame-decoder", new GntpFrameDecoder)
-          pipeline.addLast("request-decoder", new GntpRequestDecoder)
-          pipeline.addLast("response-encoder", new GntpResponseEncoder)
+          pipeline.addLast("server-codec",
+            new NaggatiCodec(GntpRequestCodec.decode, GntpResponseCodec.encode))
 
           pipeline
         }

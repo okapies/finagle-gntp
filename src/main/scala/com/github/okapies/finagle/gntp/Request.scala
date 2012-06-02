@@ -1,15 +1,16 @@
 package com.github.okapies.finagle.gntp
 
-import java.awt.image.RenderedImage
 import java.net.URI
-import java.util.Date
 
 import scala.collection._
+import scala.runtime.ScalaRunTime
+
+import com.github.okapies.finagle.gntp.protocol.GntpConstants._
 
 /**
  * Request
  */
-sealed trait Request { def customHeaders: Map[String, Any] }
+sealed trait Request extends Message
 
 /**
  * REGISTER request
@@ -18,9 +19,11 @@ case class Register(
 
   application: Application,
 
-  notificationTypes: List[NotificationType],
+  headers: Map[String, String] = immutable.Map.empty,
 
-  customHeaders: Map[String, Any] = immutable.Map.empty
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
 
 ) extends Request
 
@@ -31,24 +34,85 @@ case class Application(
 
   name: String,
 
-  icon: Icon = NoIcon
+  notificationTypes: Map[String, NotificationType],
+
+  icon: Option[Icon] = None
 
 )
 
 /**
  * NotificationType being registered with an register.
  */
-case class NotificationType(
+class NotificationType private(
 
-  name: String,
+  val name: String,
 
-  displayName: String = null,
+  val displayName: String,
 
-  icon: Icon = NoIcon,
+  val enabled: Boolean,
 
-  enabled: Boolean = true
+  val icon: Option[Icon]
 
-)
+) extends Product with Serializable {
+
+  def copy(
+      name: String = this.name,
+      displayName: String = this.displayName,
+      enabled: Boolean = this.enabled,
+      icon: Option[Icon] = this.icon) =
+    NotificationType.apply(name, displayName, enabled, icon)
+
+  override def productPrefix = "NotificationType"
+
+  def productArity = 4
+
+  def productElement(n: Int): Any = n match {
+    case 0 => this.name
+    case 1 => this.displayName
+    case 2 => this.enabled
+    case 3 => this.icon
+    case _ => throw new IndexOutOfBoundsException(n.toString)
+  }
+
+  def canEqual(that: Any) = that.isInstanceOf[NotificationType]
+
+  override def equals(that: Any) = ScalaRunTime._equals(this, that)
+
+  override def hashCode() = ScalaRunTime._hashCode(this)
+
+  override def toString = ScalaRunTime._toString(this)
+
+}
+
+object NotificationType {
+
+  val DEFAULT_DISPLAY_NAME: String = null
+
+  val DEFAULT_ENABLED = false
+
+  /**
+   * An `NotificationType` factory.
+   *
+   * @param name the name (type) of the notification being registered
+   * @param displayName the name of the notification that is displayed to the user
+   *                    (defaults to the same value as `name` if this is not specified)
+   * @param enabled indicates if the notification should be enabled by default
+   *                (defaults to `false`)
+   * @param icon the default icon to use for notifications of this type
+   * @return the notification type
+   */
+  def apply(
+      name: String,
+      displayName: String = DEFAULT_DISPLAY_NAME,
+      enabled: Boolean = DEFAULT_ENABLED,
+      icon: Option[Icon] = None) = displayName match {
+    case null => new NotificationType(name, name, enabled, icon)
+    case _ => new NotificationType(name, displayName, enabled, icon)
+  }
+
+  def unapply(n: NotificationType) = Some((n.name, n.displayName, n.enabled, n.icon))
+
+}
 
 /**
  * NOTIFY request
@@ -59,27 +123,37 @@ case class Notify(
 
   name: String,
 
-  id: String = null,
+  id: Option[String] = None,
 
   title: String,
 
-  text: String = null,
+  text: String = Notify.DEFAULT_TEXT,
 
-  icon: Icon = NoIcon,
+  icon: Option[Icon] = None,
 
-  sticky: Boolean = false,
+  sticky: Boolean = Notify.DEFAULT_STICKY,
 
-  priority: Notify.Priority.Value = Notify.Priority.NORMAL,
+  priority: Notify.Priority.Value = Notify.DEFAULT_PRIORITY,
 
-  coalescingId: String = null,
+  coalescingId: Option[String] = None,
 
-  callback: Callback = NoCallback,
+  callback: Option[Callback] = None,
 
-  customHeaders: Map[String, Any] = immutable.Map.empty
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
 
 ) extends Request
 
 object Notify {
+
+  val DEFAULT_TEXT = ""
+
+  val DEFAULT_STICKY = false
+
+  val DEFAULT_PRIORITY = Notify.Priority.NORMAL
 
   object Priority extends Enumeration {
 
@@ -97,20 +171,6 @@ object Notify {
 
   }
 
-  def apply(
-      application: Application,
-      notificationType: NotificationType,
-      id: String,
-      title: String,
-      text: String): Notify =
-    Notify(
-      applicationName = application.name,
-      name = notificationType.name,
-      id = id,
-      title = title,
-      text = text
-    )
-
 }
 
 /**
@@ -122,9 +182,13 @@ case class Subscribe(
 
   name: String,
 
-  port: Int = -1,
+  port: Int = DEFAULT_GNTP_PORT,
 
-  customHeaders: Map[String, Any] = immutable.Map.empty
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
 
 ) extends Request
 
@@ -133,9 +197,7 @@ case class Subscribe(
  */
 sealed trait Icon
 
-case object NoIcon extends Icon
-
-case class IconImage(image: RenderedImage) extends Icon
+case class IconImage(image: Resource) extends Icon
 
 case class IconUri(uri: URI) extends Icon
 
@@ -150,12 +212,7 @@ object IconUri {
  */
 sealed trait Callback
 
-case object NoCallback extends Callback
-
-case class SocketCallback(
-  context: String,
-  contextType: String
-) extends Callback
+case class SocketCallback(context: String, contextType: String) extends Callback
 
 case class UrlCallback(target: URI) extends Callback
 

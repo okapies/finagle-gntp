@@ -7,52 +7,87 @@ import scala.collection._
 /**
  * Response
  */
-sealed trait Response { def headers: Map[String, String] }
+sealed trait Response extends Message
 
-object Response {
-
-  def unapply(response: Response) = Some(response.headers)
-
-}
+sealed trait SuccessfulResponse extends Response
 
 /**
  * OK response
  */
-trait OkResponse extends Response
-
-object OkResponse {
-
-  def unapply(response: OkResponse) = Some(response.headers)
-
-}
+sealed trait OkResponse extends SuccessfulResponse
 
 case class RegisterOkResponse(
-  headers: Map[String, String]) extends OkResponse
+
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
+
+) extends OkResponse
 
 case class NotifyOkResponse(
-  notificationId: String,
-  headers: Map[String, String]) extends OkResponse
+
+  id: String,
+
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
+
+) extends OkResponse
 
 case class SubscribeOkResponse(
-  ttl: Long,
-  headers: Map[String, String]) extends OkResponse
+
+  ttl: Int,
+
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
+
+) extends OkResponse
 
 /**
  * CALLBACK response
  */
 case class CallbackResponse(
+
   applicationName: String,
+
   notificationId: String,
+
   result: CallbackResult,
+
   timestamp: Date,
+
   context: String,
+
   contextType: String,
-  headers: Map[String, String]) extends Response
+
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
+
+) extends SuccessfulResponse
 
 /**
  * ERROR response
  */
 case class ErrorResponse(
+
   code: ErrorCode,
+
   description: String,
-  headers: Map[String, String])
+
+  headers: Map[String, String] = immutable.Map.empty,
+
+  encryption: Option[Encryption] = None,
+
+  authorization: Option[Authorization] = None
+
+) extends Response

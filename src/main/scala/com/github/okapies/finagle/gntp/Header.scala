@@ -84,10 +84,20 @@ object Header {
 
   val SUBSCRIPTION_TTL = "Subscription-TTL"
 
-  private val headerMatcher = """([^\r\n:]+):\s+((?:[\s\S]*\Z)|(?:.+))""".r
+  // prefixes
+
+  val ORIGIN_HEADER_PREFIX = "Origin-"
+
+  val CUSTOM_HEADER_PREFIX = "X-"
+
+  val DATA_HEADER_PREFIX = "Data-"
+
+  // parse
+
+  private val headerMatcher = """([^:]+):\s+([\s\S]*)\Z""".r
 
   def parse(line: String): Option[(String, String)] = line match {
-    case headerMatcher(name, value) => Some((name, value))
+    case headerMatcher(name, value) => Some((name, value.trim))
     case _ => None
   }
 

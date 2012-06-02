@@ -4,7 +4,11 @@ import java.nio.charset.Charset
 
 object GntpConstants {
 
+  val DEFAULT_GNTP_PORT = 23053
+
   object MessageFormat {
+
+    val SUPPORTED_VERSION = "1.0"
 
     val ENCODING = Charset.forName("UTF-8")
 
@@ -15,8 +19,6 @@ object GntpConstants {
     val TERMINATOR = Array[Byte]('\r', '\n', '\r', '\n')
 
   }
-
-  val SUPPORTED_VERSION = "1.0"
 
   // Message types in request
 
