@@ -13,23 +13,20 @@ class GntpRequestEncoder extends Encoder[Request] {
 
   def encode(request: Request): Option[ChannelBuffer] = {
     val w = new GntpMessageWriter(ChannelBuffers.dynamicBuffer)
-    try {
-      request match {
-        case register: Register => encodeRegister(w, register)
-        case notify: Notify => encodeNotify(w, notify)
-        case subscribe: Subscribe => encodeSubscribe(w, subscribe)
-      }
 
-      // other headers (generic, custom and data)
-      w.headers(request.headers)
-
-      // TODO: binary sections
-
-      // terminator
-      w.emptyLine()
-    } finally {
-      w.close()
+    request match {
+      case register: Register => encodeRegister(w, register)
+      case notify: Notify => encodeNotify(w, notify)
+      case subscribe: Subscribe => encodeSubscribe(w, subscribe)
     }
+
+    // other headers (generic, custom and data)
+    w.headers(request.headers)
+
+    // TODO: binary sections
+
+    // terminator
+    w.emptyLine()
 
     Some(w.toChannelBuffer)
   }
@@ -61,7 +58,7 @@ class GntpRequestEncoder extends Encoder[Request] {
     w.header(NOTIFICATION_TITLE, notify.title) // required
     w.header(NOTIFICATION_TEXT, notify.text)
 
-    w.header(NOTIFICATION_STICKY, notify.sticky.toString.capitalize)
+    w.header(NOTIFICATION_STICKY, notify.sticky)
     w.header(NOTIFICATION_PRIORITY, notify.priority.id)
     w.iconHeader(NOTIFICATION_ICON, notify.icon)
     w.header(NOTIFICATION_COALESCING_ID, notify.coalescingId)

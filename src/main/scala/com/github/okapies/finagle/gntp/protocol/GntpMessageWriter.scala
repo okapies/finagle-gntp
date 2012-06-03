@@ -1,6 +1,5 @@
 package com.github.okapies.finagle.gntp.protocol
 
-import java.io.{IOException, OutputStreamWriter, Writer}
 import java.net.URI
 import java.util.Date
 
@@ -16,21 +15,15 @@ private[protocol] class GntpMessageWriter(buffer: ChannelBuffer) {
   import GntpMessageWriter._
 
   import GntpConstants.MessageFormat._
+  import Header._
   import util.GntpDateFormat
-
-  private val writer: Writer =
-    new OutputStreamWriter(new ChannelBufferOutputStream(buffer), ENCODING)
 
   def toChannelBuffer = buffer
 
-  @throws(classOf[IOException])
-  def close() { writer.close() }
-
   def emptyLine() {
-    writer.write(LINE_SEPARATOR)
+    buffer.writeBytes(LINE_SEPARATOR.getBytes(ENCODING))
   }
 
-  @throws(classOf[IOException])
   def informationLine(
       messageType: String,
       encryption: Option[Encryption],
@@ -50,47 +43,50 @@ private[protocol] class GntpMessageWriter(buffer: ChannelBuffer) {
       case None => ""
     })
 
-    writer.write(infoLine.toString + LINE_SEPARATOR)
+    buffer.writeBytes((infoLine.toString + LINE_SEPARATOR).getBytes(ENCODING))
   }
 
-  @throws(classOf[IOException])
   def header(name: String, value: String) {
     if (value != null) {
-      val line = separatorMatcher.replaceAllIn(value, "\n")
-      writer.write(name + ": " + line + LINE_SEPARATOR)
+      val line =
+        name + ": " + separatorMatcher.replaceAllIn(value, "\n") + LINE_SEPARATOR
+      buffer.writeBytes(line.getBytes(ENCODING))
     }
   }
 
-  @throws(classOf[IOException])
   def header(name: String, value: Option[String]) {
     value.foreach { _ => header(name, value.get) }
   }
 
-  @throws(classOf[IOException])
   def header(name: String, value: Int) {
-    writer.write(name + ": " + value + LINE_SEPARATOR)
+    val line = name + ": " + value + LINE_SEPARATOR
+    buffer.writeBytes(line.getBytes(ENCODING))
   }
 
-  @throws(classOf[IOException])
+  def header(name: String, value: Long) {
+    val line = name + ": " + value + LINE_SEPARATOR
+    buffer.writeBytes(line.getBytes(ENCODING))
+  }
+
   def header(name: String, value: Boolean) {
-    writer.write(name + ": " + value + LINE_SEPARATOR)
+    val line = name + ": " + value.toString.capitalize + LINE_SEPARATOR
+    buffer.writeBytes(line.getBytes(ENCODING))
   }
 
-  @throws(classOf[IOException])
   def header(name: String, value: Date) {
     if (value != null) {
-      writer.write(name + ": " + GntpDateFormat.toString(value) + LINE_SEPARATOR)
+      val line = name + ": " + GntpDateFormat.toString(value) + LINE_SEPARATOR
+      buffer.writeBytes(line.getBytes(ENCODING))
     }
   }
 
-  @throws(classOf[IOException])
   def header(name: String, value: URI) {
     if (value != null) {
-      writer.write(name + ": " + value.toString + LINE_SEPARATOR)
+      val line = name + ": " + value.toString + LINE_SEPARATOR
+      buffer.writeBytes(line.getBytes(ENCODING))
     }
   }
 
-  @throws(classOf[IOException])
   def iconHeader(name: String, icon: Option[Icon]) {
     icon match {
       case Some(IconUri(uri)) => header(name, uri.toString)
@@ -99,9 +95,20 @@ private[protocol] class GntpMessageWriter(buffer: ChannelBuffer) {
     }
   }
 
-  @throws(classOf[IOException])
   def headers(headers: Map[String, String]) {
     headers.foreach { case (name, value) => header(name, value) }
+  }
+
+  def resources(resources: Map[ResourceId, Resource]) {
+    resources.foreach { case (_, res) =>
+      header(RESOURCE_IDENTIFIER, res.id.toUniqueValue)
+      header(RESOURCE_LENGTH, res.length)
+      emptyLine()
+
+      buffer.writeBytes(res.data)
+      emptyLine()
+      emptyLine()
+    }
   }
 
 }

@@ -14,25 +14,22 @@ class GntpResponseEncoder extends Encoder[Response] {
 
   def encode(response: Response): Option[ChannelBuffer] = {
     val w = new GntpMessageWriter(ChannelBuffers.dynamicBuffer)
-    try {
-      response match {
-        case register: RegisterOkResponse => encodeRegisterOkResponse(w, register)
-        case notify: NotifyOkResponse => encodeNotifyOkResponse(w, notify)
-        case subscribe: SubscribeOkResponse => encodeSubscribeOkResponse(w, subscribe)
-        case callback: CallbackResponse => encodeCallbackResponse(w, callback)
-        case error: ErrorResponse => encodeErrorResponse(w, error)
-      }
 
-      // other informational headers (generic, custom and data)
-      w.headers(response.headers)
-
-      // TODO: binary sections
-
-      // terminator
-      w.emptyLine()
-    } finally {
-      w.close()
+    response match {
+      case register: RegisterOkResponse => encodeRegisterOkResponse(w, register)
+      case notify: NotifyOkResponse => encodeNotifyOkResponse(w, notify)
+      case subscribe: SubscribeOkResponse => encodeSubscribeOkResponse(w, subscribe)
+      case callback: CallbackResponse => encodeCallbackResponse(w, callback)
+      case error: ErrorResponse => encodeErrorResponse(w, error)
     }
+
+    // other informational headers (generic, custom and data)
+    w.headers(response.headers)
+
+    // TODO: binary sections
+
+    // terminator
+    w.emptyLine()
 
     Some(w.toChannelBuffer)
   }
