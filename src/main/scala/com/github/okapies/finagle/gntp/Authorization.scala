@@ -6,9 +6,9 @@ case class Authorization(
 
   algorithm: AuthorizationAlgorithm,
 
-  keyHash: String,
+  keyHash: Array[Byte],
 
-  salt: String
+  salt: Array[Byte]
 
 )
 

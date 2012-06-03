@@ -92,8 +92,10 @@ trait GntpMessageCodec[A <: Message] {
     try {
       keyHashAlgorithmID match {
         case null => None
-        case _ => Some(
-          new Authorization(AuthorizationAlgorithm.withName(keyHashAlgorithmID), keyHash, salt))
+        case _ => Some(new Authorization(
+          AuthorizationAlgorithm.withName(keyHashAlgorithmID),
+          Hex.decodeHex(keyHash.toCharArray),
+          Hex.decodeHex(salt.toCharArray)))
       }
     } catch {
       case e: NoSuchElementException =>

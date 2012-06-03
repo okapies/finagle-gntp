@@ -6,6 +6,7 @@ import java.util.Date
 
 import scala.collection._
 
+import org.apache.commons.codec.binary.Hex
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBufferOutputStream}
 
 import com.github.okapies.finagle.gntp._
@@ -38,12 +39,14 @@ private[protocol] class GntpMessageWriter(buffer: ChannelBuffer) {
 
     infoLine.append("GNTP/1.0 " + messageType + " ")
     infoLine.append(encryption match {
-      case Some(enc) => enc.algorithm.toString + enc.iv.map(":" + _)
+      case Some(enc) => enc.algorithm.toString +
+        enc.iv.map(iv => ":" + Hex.encodeHex(iv, false))
       case None => "NONE"
     })
     infoLine.append(authorization match {
-      case Some(auth) =>
-        " " + auth.algorithm.toString + ":" + auth.keyHash + "." + auth.salt
+      case Some(auth) => " " + auth.algorithm.toString + ":" +
+        Hex.encodeHex(auth.keyHash, false) + "." +
+        Hex.encodeHex(auth.salt, false)
       case None => ""
     })
 
