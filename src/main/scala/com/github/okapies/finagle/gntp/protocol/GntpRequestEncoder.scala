@@ -61,7 +61,7 @@ class GntpRequestEncoder extends Encoder[Request] {
     w.header(NOTIFICATION_TITLE, notify.title) // required
     w.header(NOTIFICATION_TEXT, notify.text)
 
-    w.header(NOTIFICATION_STICKY, notify.sticky)
+    w.header(NOTIFICATION_STICKY, notify.sticky.toString.capitalize)
     w.header(NOTIFICATION_PRIORITY, notify.priority.id)
     w.iconHeader(NOTIFICATION_ICON, notify.icon)
     w.header(NOTIFICATION_COALESCING_ID, notify.coalescingId)

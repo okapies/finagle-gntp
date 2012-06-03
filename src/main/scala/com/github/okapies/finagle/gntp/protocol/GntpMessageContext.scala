@@ -27,6 +27,7 @@ private[protocol] class GntpMessageContext(
 ) {
 
   import ErrorCode._
+  import util.GntpBoolean._
   import Header._
   import NotificationType._
 
@@ -68,7 +69,7 @@ private[protocol] class GntpMessageContext(
       (name, NotificationType(
         name,
         typeHeaders.get(NOTIFICATION_DISPLAY_NAME).getOrElse(DEFAULT_DISPLAY_NAME),
-        typeHeaders.get(NOTIFICATION_ENABLED).map(_.toBoolean).getOrElse(DEFAULT_ENABLED),
+        typeHeaders.get(NOTIFICATION_ENABLED).map(parseBoolean _).getOrElse(DEFAULT_ENABLED),
         toIcon(typeHeaders, NOTIFICATION_ICON)))
     }.toMap
 

@@ -2,15 +2,13 @@ package com.github.okapies.finagle.gntp.protocol
 
 import java.net.URI
 
-import scala.collection._
-
 import com.twitter.naggati.Encoder
 
 import com.github.okapies.finagle.gntp._
 
 object GntpRequestCodec extends GntpMessageCodec[Request] {
 
-  import ErrorCode._
+  import util.GntpBoolean._
   import GntpConstants._
   import GntpConstants.RequestMessageType._
   import Header._
@@ -27,9 +25,8 @@ object GntpRequestCodec extends GntpMessageCodec[Request] {
         "The message type is invalid: " + ctx.messageType)
   }
 
+  @throws(classOf[GntpProtocolException])
   private def decodeRegister(ctx: GntpMessageContext): Request = {
-    import NotificationType._
-
     // required
     val appName = ctx.toRequiredHeader(APPLICATION_NAME)
     val types = ctx.toNotificationTypes
@@ -41,6 +38,7 @@ object GntpRequestCodec extends GntpMessageCodec[Request] {
       ctx.unhandledHeaders, ctx.encryption, ctx.authorization)
   }
 
+  @throws(classOf[GntpProtocolException])
   private def decodeNotify(ctx: GntpMessageContext): Request = {
     import Notify._
 
@@ -52,13 +50,13 @@ object GntpRequestCodec extends GntpMessageCodec[Request] {
     // optional
     val id = ctx.toOptionalHeader(NOTIFICATION_ID)
     val text = ctx.toOptionalHeader(NOTIFICATION_TEXT).getOrElse(DEFAULT_TEXT)
-    val icon = ctx.toIcon(NOTIFICATION_ICON)
     val sticky = ctx.toOptionalHeader(NOTIFICATION_STICKY).map {
-      _.toBoolean
+      parseBoolean _
     }.getOrElse(DEFAULT_STICKY)
     val priority = ctx.toOptionalHeader(NOTIFICATION_PRIORITY).map {
       v => Priority(v.toInt)
     }.getOrElse(DEFAULT_PRIORITY)
+    val icon = ctx.toIcon(NOTIFICATION_ICON)
 
     val coalescingId = ctx.toOptionalHeader(NOTIFICATION_COALESCING_ID)
     val callback = ctx.toOptionalHeader(NOTIFICATION_CALLBACK_TARGET) match {
@@ -79,6 +77,7 @@ object GntpRequestCodec extends GntpMessageCodec[Request] {
       ctx.unhandledHeaders, ctx.encryption, ctx.authorization)
   }
 
+  @throws(classOf[GntpProtocolException])
   private def decodeSubscribe(ctx: GntpMessageContext): Request = {
     // required
     val id = ctx.toRequiredHeader(SUBSCRIBER_ID)
